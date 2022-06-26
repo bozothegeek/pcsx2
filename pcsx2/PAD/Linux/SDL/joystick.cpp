@@ -68,8 +68,11 @@ void JoystickInfo::EnumerateJoysticks(std::vector<std::unique_ptr<Device>>& vjoy
 				Console.Warning("Failed to load SDL Game Controller DB file!");
 
 			// Add user mapping too
-			for (auto const& map : g_conf.sdl2_mapping)
-				SDL_GameControllerAddMapping(map.c_str());
+			//for (auto const& map : g_conf.sdl2_mapping)
+			//	SDL_GameControllerAddMapping(map.c_str());
+			
+			// load mappings from Pegasus-Frontend to do it simply for the moment
+			SDL_GameControllerAddMappingsFromFile("/recalbox/share/system/.config/pegasus-frontend/sdl_controllers.txt");
 		}
 	}
 
