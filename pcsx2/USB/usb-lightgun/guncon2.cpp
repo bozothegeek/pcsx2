@@ -641,7 +641,7 @@ namespace usb_lightgun
 	  struct udev_enumerate *enumerate;
 	  struct udev_list_entry     *devs = NULL;
 	  struct udev_list_entry     *item = NULL;
-	  unsigned sorted_count = 0;
+	  //unsigned sorted_count = 0;
 	  struct event_udev_entry sorted[8]; // max devices
 	  unsigned int i;
 	  struct udev *udev;
@@ -652,17 +652,16 @@ namespace usb_lightgun
 
 	  enumerate = udev_enumerate_new(udev);
 
-	  if (enumerate != NULL) {
-	    //udev_enumerate_add_match_property(enumerate, "ID_INPUT_MOUSE", "1");
+	  if (enumerate != NULL && us->pathdevice.c_str()) {
+		//udev_enumerate_add_match_property(enumerate, "ID_INPUT_MOUSE", "1");
 		Console.WriteLn(fmt::format("udev_open_gun: us->pathdevice.c_str()  '{}'", us->pathdevice.c_str()));
-		//if(us->pathdevice.c_str()) 
 		udev_enumerate_add_match_property(enumerate, "DEVNAME", us->pathdevice.c_str());
-	    udev_enumerate_add_match_subsystem(enumerate, "input");
-	    udev_enumerate_scan_devices(enumerate);
-	    devs = udev_enumerate_get_list_entry(enumerate);
-
-	    for (item = devs; item; item = udev_list_entry_get_next(item)) {
-	      const char         *name = udev_list_entry_get_name(item);
+		udev_enumerate_add_match_subsystem(enumerate, "input");
+		udev_enumerate_scan_devices(enumerate);
+		devs = udev_enumerate_get_list_entry(enumerate);
+		//normally only one will be available but we keep full list scan in case of issue and avoid crash
+		for (item = devs; item; item = udev_list_entry_get_next(item)) {
+		  const char         *name = udev_list_entry_get_name(item);
 		  if(name) Console.WriteLn(fmt::format("udev_open_gun: udev_list_entry_get_name(item)  '{}'", name));
 		  else Console.WriteLn("udev_open_gun: udev_list_entry_get_name(item)  return NULL");
 		  struct udev_device  *dev = udev_device_new_from_syspath(udev, name);
@@ -670,28 +669,29 @@ namespace usb_lightgun
 		  if(devnode) Console.WriteLn(fmt::format("udev_open_gun: udev_device_get_devnode(item)  '{}'", devnode));
 		  else Console.WriteLn("udev_open_gun: udev_device_get_devnode(item)  return NULL");
 
-	      if (devnode != NULL && sorted_count < 8) {
+		//remove sorting not used in our case because we work by event to avoid issue !!!
+	    /*  if (devnode != NULL && sorted_count < 8) {
 		sorted[sorted_count].devnode = devnode;
 		sorted[sorted_count].item = item;
 		sorted_count++;
 	      } else {
 		udev_device_unref(dev);
 	      }
-	    }
-
+	    }*/
 	    /* Sort the udev entries by devnode name so that they are
 	     * created in the proper order */
-	    qsort(sorted, sorted_count,
+	    /*qsort(sorted, sorted_count,
 		  sizeof(struct event_udev_entry), sort_devnodes);
 
 	    for (i = 0; i < sorted_count; i++) {
 	      if((i == us->port && us->numdevice == -1) || (i == us->numdevice && us->numdevice >= 0 )) {
 		const char *name = udev_list_entry_get_name(sorted[i].item);
-
+		*/
 		/* Get the filename of the /sys entry for the device
 		 * and create a udev_device object (dev) representing it. */
-		struct udev_device *dev = udev_device_new_from_syspath(udev, name);
-		const char *devnode     = udev_device_get_devnode(dev);
+		/*struct udev_device *dev = udev_device_new_from_syspath(udev, name);
+		const char *devnode     = udev_device_get_devnode(dev);*/
+		
 		char devname[64];
 
 		if (devnode) {
