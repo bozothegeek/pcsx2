@@ -157,6 +157,7 @@ namespace usb_lightgun
 		float scale_y = 1.0f;
 		int numdevice = -1;
 		std::string pathdevice = "";
+		bool calibrated = false;
 
 		//////////////////////////////////////////////////////////////////////////
 		// Host State (Not Saved)
@@ -307,47 +308,24 @@ namespace usb_lightgun
 		switch (event->type) {
 			case EV_KEY:
 				//Console.WriteLn(fmt::format("                          event->code  '{}'", event->code));
-				//Console.WriteLn(fmt::format("                          BTN_LEFT code:  '{}'", BTN_LEFT));
-				//Console.WriteLn(fmt::format("                          BTN_RIGHT code:  '{}'", BTN_RIGHT));
 				switch (event->code) {
 					case BTN_LEFT:
 						Console.WriteLn("event->type ('EV_KEY') event->code ('BTN_LEFT')");
 						Console.WriteLn(fmt::format("                       event->value  '{}'", event->value));
 						updateState(us, BID_TRIGGER, event->value != 0); // 0: unpressed, 1: pressed, 2: maintained
+						//tip to manage "buggy" calibration easily in PCSX2
+						if (!us->calibrated) updateState(us, BID_RECALIBRATE, event->value != 0);
 					break;
 					case BTN_RIGHT:
 						Console.WriteLn("event->type ('EV_KEY') event->code ('BTN_RIGHT')");
 						Console.WriteLn(fmt::format("                       event->value  '{}'", event->value));
-						updateState(us, BID_C, event->value != 0);
+						//important to release calibration and to reload
+						updateState(us, BID_A, event->value != 0);
+						//tip to force end of calibration in all cases if we use A button
+						us->calibrated = true;
 					break;
 					case BTN_MIDDLE:
-						updateState(us, BID_A, event->value != 0);
-					break;
-					case BTN_1:
 						updateState(us, BID_B, event->value != 0);
-					break;
-					case BTN_2:
-						updateState(us, BID_RECALIBRATE, event->value != 0);
-					break;
-					case BTN_3:
-						updateState(us, BID_START, event->value != 0);
-					break;
-					case BTN_4:
-						updateState(us, BID_SELECT, event->value != 0);
-					break;
-					case BTN_5:
-						updateState(us, BID_DPAD_UP, event->value != 0);
-					break;
-					case BTN_6:
-						updateState(us, BID_DPAD_DOWN, event->value != 0);
-					break;
-					case BTN_7:
-						updateState(us, BID_DPAD_LEFT, event->value != 0);
-					break;
-					case BTN_8:
-						updateState(us, BID_DPAD_RIGHT, event->value != 0);
-					break;
-					case BTN_9:
 					break;
 					default:
 					break;
@@ -652,59 +630,61 @@ namespace usb_lightgun
 
 	  enumerate = udev_enumerate_new(udev);
 
-	  if (enumerate != NULL && us->pathdevice.c_str()) {
+	  if (enumerate != NULL) {
 		//udev_enumerate_add_match_property(enumerate, "ID_INPUT_MOUSE", "1");
-		Console.WriteLn(fmt::format("udev_open_gun: us->pathdevice.c_str()  '{}'", us->pathdevice.c_str()));
-		udev_enumerate_add_match_property(enumerate, "DEVNAME", us->pathdevice.c_str());
-		udev_enumerate_add_match_subsystem(enumerate, "input");
-		udev_enumerate_scan_devices(enumerate);
-		devs = udev_enumerate_get_list_entry(enumerate);
-		//normally only one will be available but we keep full list scan in case of issue and avoid crash
-		for (item = devs; item; item = udev_list_entry_get_next(item)) {
-		  const char         *name = udev_list_entry_get_name(item);
-		  if(name) Console.WriteLn(fmt::format("udev_open_gun: udev_list_entry_get_name(item)  '{}'", name));
-		  else Console.WriteLn("udev_open_gun: udev_list_entry_get_name(item)  return NULL");
-		  struct udev_device  *dev = udev_device_new_from_syspath(udev, name);
-	      const char      *devnode = udev_device_get_devnode(dev);
-		  if(devnode) Console.WriteLn(fmt::format("udev_open_gun: udev_device_get_devnode(item)  '{}'", devnode));
-		  else Console.WriteLn("udev_open_gun: udev_device_get_devnode(item)  return NULL");
+		if(us->pathdevice.c_str()) {
+			Console.WriteLn(fmt::format("udev_open_gun: us->pathdevice.c_str()  '{}'", us->pathdevice.c_str()));
+			udev_enumerate_add_match_property(enumerate, "DEVNAME", us->pathdevice.c_str());
+			udev_enumerate_add_match_subsystem(enumerate, "input");
+			udev_enumerate_scan_devices(enumerate);
+			devs = udev_enumerate_get_list_entry(enumerate);
+			//normally only one will be available but we keep full list scan in case of issue and avoid crash
+			const char *name;
+			struct udev_device *dev;
+			const char *devnode;
+			for (item = devs; item; item = udev_list_entry_get_next(item)) {
+			  name = udev_list_entry_get_name(item);
+			  if(name) Console.WriteLn(fmt::format("udev_open_gun: udev_list_entry_get_name(item)  '{}'", name));
+			  else Console.WriteLn("udev_open_gun: udev_list_entry_get_name(item)  return NULL");
+			  dev = udev_device_new_from_syspath(udev, name);
+			  devnode = udev_device_get_devnode(dev);
+			  if(devnode) Console.WriteLn(fmt::format("udev_open_gun: udev_device_get_devnode(item)  '{}'", devnode));
+			  else Console.WriteLn("udev_open_gun: udev_device_get_devnode(item)  return NULL");
+			}
+			//remove sorting not used in our case because we work by event to avoid issue !!!
+			/*  if (devnode != NULL && sorted_count < 8) {
+			sorted[sorted_count].devnode = devnode;
+			sorted[sorted_count].item = item;
+			sorted_count++;
+			  } else {
+			udev_device_unref(dev);
+			  }*/
+			/* Sort the udev entries by devnode name so that they are
+			 * created in the proper order */
+			/*qsort(sorted, sorted_count,
+			  sizeof(struct event_udev_entry), sort_devnodes);
 
-		//remove sorting not used in our case because we work by event to avoid issue !!!
-	    /*  if (devnode != NULL && sorted_count < 8) {
-		sorted[sorted_count].devnode = devnode;
-		sorted[sorted_count].item = item;
-		sorted_count++;
-	      } else {
-		udev_device_unref(dev);
-	      }
-	    }*/
-	    /* Sort the udev entries by devnode name so that they are
-	     * created in the proper order */
-	    /*qsort(sorted, sorted_count,
-		  sizeof(struct event_udev_entry), sort_devnodes);
-
-	    for (i = 0; i < sorted_count; i++) {
-	      if((i == us->port && us->numdevice == -1) || (i == us->numdevice && us->numdevice >= 0 )) {
-		const char *name = udev_list_entry_get_name(sorted[i].item);
-		*/
-		/* Get the filename of the /sys entry for the device
-		 * and create a udev_device object (dev) representing it. */
-		/*struct udev_device *dev = udev_device_new_from_syspath(udev, name);
-		const char *devnode     = udev_device_get_devnode(dev);*/
-		
-		char devname[64];
-
-		if (devnode) {
-		  fd = open(devnode, O_RDONLY | O_NONBLOCK);
-		  if (fd != -1) {
-		    if (ioctl(fd, EVIOCGNAME(sizeof(devname)), devname) < 0) {
-		      devname[0] = '\0';
-		    }
-		  }
+			for (i = 0; i < sorted_count; i++) {
+			  if((i == us->port && us->numdevice == -1) || (i == us->numdevice && us->numdevice >= 0 )) {
+			const char *name = udev_list_entry_get_name(sorted[i].item);
+			*/
+			/* Get the filename of the /sys entry for the device
+			 * and create a udev_device object (dev) representing it. */
+			/*struct udev_device *dev = udev_device_new_from_syspath(udev, name);
+			const char *devnode     = udev_device_get_devnode(dev);*/
+			
+			char devname[64];
+			if (devnode) {
+			  fd = open(devnode, O_RDONLY | O_NONBLOCK);
+			  if (fd != -1) {
+				if (ioctl(fd, EVIOCGNAME(sizeof(devname)), devname) < 0) {
+				  devname[0] = '\0';
+				}
+			  }
+			  udev_device_unref(dev);
+			}
 		}
-		udev_device_unref(dev);
-	      }
-	    }
+		else Console.WriteLn("udev_open_gun: us->pathdevice.c_str()  return NULL ");
 	    udev_enumerate_unref(enumerate);
 	  }
 	  if (udev != NULL) udev_unref(udev);
@@ -713,6 +693,9 @@ namespace usb_lightgun
 	  us->udev_fd = fd;
 	  if(fd != -1) {
 	    udev_configure_gun(us);
+	  }
+	  else{
+	    Console.WriteLn("udev_configure_gun not done !!!");
 	  }
 	}
 
@@ -738,8 +721,13 @@ namespace usb_lightgun
 		Console.WriteLn(fmt::format("(GunCom2) (pixL-version): CreateDevice - numdevice '{}'", s->numdevice));
 		// path device
 		s->pathdevice = USB::GetConfigString(si, s->port, TypeName(), "device_path");
-		Console.WriteLn(fmt::format("(GunCom2) (pixL-version): CreateDevice -  pathdevice '{}'", s->pathdevice));
-	
+		if(s->pathdevice.c_str()){
+			Console.WriteLn(fmt::format("(GunCom2) (pixL-version): CreateDevice -  pathdevice '{}'", s->pathdevice));
+		}
+		else{
+			Console.WriteLn(fmt::format("(GunCom2) (pixL-version): CreateDevice -  missing device_path parameter !"));
+			goto fail;
+		}
 		udev_open_gun(s);
 
 		s->desc.full = &s->desc_dev;
