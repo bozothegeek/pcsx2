@@ -156,6 +156,7 @@ namespace usb_lightgun
 		float scale_x = 1.0f;
 		float scale_y = 1.0f;
 		int numdevice = -1;
+		std::string pathdevice = "";
 
 		//////////////////////////////////////////////////////////////////////////
 		// Host State (Not Saved)
@@ -652,7 +653,10 @@ namespace usb_lightgun
 	  enumerate = udev_enumerate_new(udev);
 
 	  if (enumerate != NULL) {
-	    udev_enumerate_add_match_property(enumerate, "ID_INPUT_MOUSE", "1");
+	    //udev_enumerate_add_match_property(enumerate, "ID_INPUT_MOUSE", "1");
+		Console.WriteLn(fmt::format("udev_open_gun: us->pathdevice.c_str()  '{}'", us->pathdevice.c_str()));
+		//if(us->pathdevice.c_str()) 
+		udev_enumerate_add_match_property(enumerate, "DEVNAME", us->pathdevice.c_str());
 	    udev_enumerate_add_match_subsystem(enumerate, "input");
 	    udev_enumerate_scan_devices(enumerate);
 	    devs = udev_enumerate_get_list_entry(enumerate);
@@ -726,11 +730,16 @@ namespace usb_lightgun
 
 	USBDevice* GunCon2Device::CreateDevice(SettingsInterface& si, u32 port, u32 subtype) const
 	{
+		// USB port index
+		Console.WriteLn(fmt::format("(GunCom2) (pixL-version): CreateDevice -  port '{}'", port));
 		GunCon2State* s = new GunCon2State(port);
-
-		// gun device
+		// index device
 		s->numdevice = USB::GetConfigInt(si, s->port, TypeName(), "numdevice", -1);
-
+		Console.WriteLn(fmt::format("(GunCom2) (pixL-version): CreateDevice - numdevice '{}'", s->numdevice));
+		// path device
+		s->pathdevice = USB::GetConfigString(si, s->port, TypeName(), "device_path");
+		Console.WriteLn(fmt::format("(GunCom2) (pixL-version): CreateDevice -  pathdevice '{}'", s->pathdevice));
+	
 		udev_open_gun(s);
 
 		s->desc.full = &s->desc_dev;
