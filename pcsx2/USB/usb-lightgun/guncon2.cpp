@@ -273,7 +273,7 @@ namespace usb_lightgun
 			us->auto_config_done = true;
 		}
 
-		DevCon.WriteLn("guncon2: req %04X val: %04X idx: %04X len: %d\n", request, value, index, length);
+		DevCon.WriteLn("(GunCon2) (pixL-version): req %04X val: %04X idx: %04X len: %d\n", request, value, index, length);
 		if (usb_desc_handle_control(dev, p, request, value, index, length, data) >= 0)
 			return;
 
@@ -282,7 +282,7 @@ namespace usb_lightgun
 			us->param_x = static_cast<u16>(data[0]) | (static_cast<u16>(data[1]) << 8);
 			us->param_y = static_cast<u16>(data[2]) | (static_cast<u16>(data[3]) << 8);
 			us->param_mode = static_cast<u16>(data[4]) | (static_cast<u16>(data[5]) << 8);
-			DevCon.WriteLn("GunCon2 Set Param %04X %d %d", us->param_mode, us->param_x, us->param_y);
+			DevCon.WriteLn("(GunCon2) (pixL-version): Set Param %04X %d %d", us->param_mode, us->param_x, us->param_y);
 			return;
 		}
 
@@ -302,60 +302,67 @@ namespace usb_lightgun
 	}
 
 	static void udev_handle_event(GunCon2State* us, input_event* event) {
-	  switch (event->type) {
-	  case EV_KEY:
-	    switch (event->code) {
-	    case BTN_LEFT:
-		updateState(us, BID_TRIGGER, event->value != 0); // 0: unpressed, 1: pressed, 2: maintained
-		break;
-	    case BTN_RIGHT:
-		updateState(us, BID_C, event->value != 0);
-		break;
-	    case BTN_MIDDLE:
-		updateState(us, BID_A, event->value != 0);
-		break;
-	    case BTN_1:
-		updateState(us, BID_B, event->value != 0);
-		break;
-	    case BTN_2:
-		updateState(us, BID_RECALIBRATE, event->value != 0);
-		break;
-	    case BTN_3:
-		updateState(us, BID_START, event->value != 0);
-		break;
-	    case BTN_4:
-		updateState(us, BID_SELECT, event->value != 0);
-		break;
-	    case BTN_5:
-		updateState(us, BID_DPAD_UP, event->value != 0);
-		break;
-	    case BTN_6:
-		updateState(us, BID_DPAD_DOWN, event->value != 0);
-		break;
-	    case BTN_7:
-		updateState(us, BID_DPAD_LEFT, event->value != 0);
-		break;
-	    case BTN_8:
-		updateState(us, BID_DPAD_RIGHT, event->value != 0);
-		break;
-	    case BTN_9:
-		break;
-	    default:
-		break;
-	    }
-	    break;
-
-	  case EV_ABS:
-	    switch (event->code) {
-	    case ABS_X:
-	      us->udev_internalGunX = ((event->value - us->udev_gunMinx) / ((float)(us->udev_gunMaxx - us->udev_gunMinx))) * g_gs_device->GetWindowWidth();
-	      break;
-	    case ABS_Y:
-	      us->udev_internalGunY = ((event->value - us->udev_gunMiny) / ((float)(us->udev_gunMaxy - us->udev_gunMiny))) * g_gs_device->GetWindowHeight();
-	      break;
-	    }
-	    break;
-	  }
+		//Console.WriteLn(fmt::format("(GunCon2) (pixL-version): event->type  '{}'", event->type));
+		switch (event->type) {
+			case EV_KEY:
+				//Console.WriteLn(fmt::format("                          event->code  '{}'", event->code));
+				//Console.WriteLn(fmt::format("                          BTN_LEFT code:  '{}'", BTN_LEFT));
+				//Console.WriteLn(fmt::format("                          BTN_RIGHT code:  '{}'", BTN_RIGHT));
+				switch (event->code) {
+					case BTN_LEFT:
+						Console.WriteLn("event->type ('EV_KEY') event->code ('BTN_LEFT')");
+						Console.WriteLn(fmt::format("                       event->value  '{}'", event->value));
+						updateState(us, BID_TRIGGER, event->value != 0); // 0: unpressed, 1: pressed, 2: maintained
+					break;
+					case BTN_RIGHT:
+						Console.WriteLn("event->type ('EV_KEY') event->code ('BTN_RIGHT')");
+						Console.WriteLn(fmt::format("                       event->value  '{}'", event->value));
+						updateState(us, BID_C, event->value != 0);
+					break;
+					case BTN_MIDDLE:
+						updateState(us, BID_A, event->value != 0);
+					break;
+					case BTN_1:
+						updateState(us, BID_B, event->value != 0);
+					break;
+					case BTN_2:
+						updateState(us, BID_RECALIBRATE, event->value != 0);
+					break;
+					case BTN_3:
+						updateState(us, BID_START, event->value != 0);
+					break;
+					case BTN_4:
+						updateState(us, BID_SELECT, event->value != 0);
+					break;
+					case BTN_5:
+						updateState(us, BID_DPAD_UP, event->value != 0);
+					break;
+					case BTN_6:
+						updateState(us, BID_DPAD_DOWN, event->value != 0);
+					break;
+					case BTN_7:
+						updateState(us, BID_DPAD_LEFT, event->value != 0);
+					break;
+					case BTN_8:
+						updateState(us, BID_DPAD_RIGHT, event->value != 0);
+					break;
+					case BTN_9:
+					break;
+					default:
+					break;
+				}
+			break;
+			case EV_ABS:
+				switch (event->code) {
+					case ABS_X:
+						us->udev_internalGunX = ((event->value - us->udev_gunMinx) / ((float)(us->udev_gunMaxx - us->udev_gunMinx))) * g_gs_device->GetWindowWidth();
+					break;
+					case ABS_Y:
+						us->udev_internalGunY = ((event->value - us->udev_gunMiny) / ((float)(us->udev_gunMaxy - us->udev_gunMiny))) * g_gs_device->GetWindowHeight();
+					break;
+				}
+			break;
+		}
 	}
 
 	static void udev_poll_gun(GunCon2State* us) {
@@ -472,7 +479,7 @@ namespace usb_lightgun
 			if (serial != gc.serial)
 				continue;
 
-			Console.WriteLn(fmt::format("(GunCon2) Using automatic config for '{}'", serial));
+			Console.WriteLn(fmt::format("(GunCon2) (pixL-version): Using automatic config for '{}'", serial));
 			Console.WriteLn(fmt::format("  Scale: {}x{}", gc.scale_x / 100.0f, gc.scale_y / 100.0f));
 			Console.WriteLn(fmt::format("  Center Position: {}x{}", gc.center_x, gc.center_y));
 			Console.WriteLn(fmt::format("  Screen Size: {}x{}", gc.screen_width, gc.screen_height));
@@ -486,7 +493,7 @@ namespace usb_lightgun
 			return;
 		}
 
-		Console.Warning(fmt::format("(GunCon2) No automatic config found for '{}'.", serial));
+		Console.Warning(fmt::format("(GunCon2) (pixL-version): No automatic config found for '{}'.", serial));
 	}
 
 	std::tuple<s16, s16> GunCon2State::CalculatePosition()
@@ -652,8 +659,12 @@ namespace usb_lightgun
 
 	    for (item = devs; item; item = udev_list_entry_get_next(item)) {
 	      const char         *name = udev_list_entry_get_name(item);
-	      struct udev_device  *dev = udev_device_new_from_syspath(udev, name);
+		  if(name) Console.WriteLn(fmt::format("udev_open_gun: udev_list_entry_get_name(item)  '{}'", name));
+		  else Console.WriteLn("udev_open_gun: udev_list_entry_get_name(item)  return NULL");
+		  struct udev_device  *dev = udev_device_new_from_syspath(udev, name);
 	      const char      *devnode = udev_device_get_devnode(dev);
+		  if(devnode) Console.WriteLn(fmt::format("udev_open_gun: udev_device_get_devnode(item)  '{}'", devnode));
+		  else Console.WriteLn("udev_open_gun: udev_device_get_devnode(item)  return NULL");
 
 	      if (devnode != NULL && sorted_count < 8) {
 		sorted[sorted_count].devnode = devnode;
