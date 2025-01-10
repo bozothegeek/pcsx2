@@ -540,7 +540,7 @@ namespace usb_lightgun
 
 	u32 GunCon2State::GetSoftwarePointerIndex() const
 	{
-		return has_relative_binds ? (InputManager::MAX_POINTER_DEVICES + port) : 0;
+		return has_relative_binds ? (InputManager::MAX_POINTER_DEVICES + port) : port;
 	}
 
 	void GunCon2State::UpdateSoftwarePointerPosition()
@@ -550,6 +550,7 @@ namespace usb_lightgun
 			return;
 
 		const auto& [window_x, window_y] = GetAbsolutePositionFromRelativeAxes();
+		Console.Warning(fmt::format("ImGuiManager::SetSoftwareCursorPosition '{}'.", GetSoftwarePointerIndex()));
 		ImGuiManager::SetSoftwareCursorPosition(GetSoftwarePointerIndex(), window_x, window_y);
 	}
 
@@ -811,6 +812,10 @@ namespace usb_lightgun
 			s->cursor_color = cursor_color;
 			if (!s->cursor_path.empty())
 			{
+				Console.WriteLn(fmt::format("SetSoftwareCursor new_pointer_index  : '{}'", new_pointer_index));
+				Console.WriteLn(fmt::format("SetSoftwareCursor s->cursor_path     : '{}'", s->cursor_path));
+				Console.WriteLn(fmt::format("SetSoftwareCursor s->cursor_scale    : '{}'", s->cursor_scale));
+				Console.WriteLn(fmt::format("SetSoftwareCursor s->cursor_color    : '{}'", s->cursor_color));
 				ImGuiManager::SetSoftwareCursor(new_pointer_index, s->cursor_path, s->cursor_scale, s->cursor_color);
 				s->UpdateSoftwarePointerPosition();
 			}
