@@ -165,12 +165,12 @@ namespace InputManager
 	static constexpr double VIBRATION_UPDATE_INTERVAL_SECONDS = 0.5; // 500ms
 
 	/// Maximum number of host mouse devices.
-	static constexpr u32 MAX_POINTER_DEVICES = 1;
+	static constexpr u32 MAX_POINTER_DEVICES = 2;
 	static constexpr u32 MAX_POINTER_BUTTONS = 3;
 
 	/// Maximum number of software cursors. We allocate an extra two for USB devices with
 	/// positioning data from the controller instead of a mouse.
-	static constexpr u32 MAX_SOFTWARE_CURSORS = MAX_POINTER_BUTTONS + 2;
+	static constexpr u32 MAX_SOFTWARE_CURSORS = MAX_POINTER_BUTTONS + MAX_POINTER_DEVICES;
 
 	/// Returns a pointer to the external input source class, if present.
 	InputSource* GetInputSourceInterface(InputSourceType type);
