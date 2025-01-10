@@ -977,12 +977,14 @@ void ImGuiManager::DestroySoftwareCursorTextures()
 void ImGuiManager::UpdateSoftwareCursorTexture(u32 index)
 {
 	SoftwareCursor& sc = s_software_cursors[index];
+	Console.WriteLn("void ImGuiManager::UpdateSoftwareCursorTexture(u32 index) - s_software_cursors[%u].image_path.c_str(): '%s'", index, sc.image_path.c_str());
 	if (sc.image_path.empty())
 	{
+		Console.WriteLn("void ImGuiManager::UpdateSoftwareCursorTexture(u32 index) - sc.texture.reset()");
 		sc.texture.reset();
 		return;
 	}
-
+	
 	Common::RGBA8Image image;
 	if (!image.LoadFromFile(sc.image_path.c_str()))
 	{
@@ -1004,8 +1006,10 @@ void ImGuiManager::UpdateSoftwareCursorTexture(u32 index)
 
 void ImGuiManager::DrawSoftwareCursor(const SoftwareCursor& sc, const std::pair<float, float>& pos)
 {
-	if (!sc.texture)
+	if (!sc.texture){
+		Console.WriteLn("void ImGuiManager::DrawSoftwareCursor(const SoftwareCursor& sc, const std::pair<float, float>& pos) no texture");
 		return;
+	}
 
 	const ImVec2 min(pos.first - sc.extent_x, pos.second - sc.extent_y);
 	const ImVec2 max(pos.first + sc.extent_x, pos.second + sc.extent_y);
@@ -1020,30 +1024,54 @@ void ImGuiManager::DrawSoftwareCursors()
 {
 	// This one's okay to race, worst that happens is we render the wrong number of cursors for a frame.
 	const u32 pointer_count = InputManager::MAX_POINTER_DEVICES;
-	for (u32 i = 0; i < pointer_count; i++)
-		DrawSoftwareCursor(s_software_cursors[i], InputManager::GetPointerAbsolutePosition(i));
-
-	for (u32 i = InputManager::MAX_POINTER_DEVICES; i < InputManager::MAX_SOFTWARE_CURSORS; i++)
-		DrawSoftwareCursor(s_software_cursors[i], s_software_cursors[i].pos);
+	for (u32 i = 0; i < pointer_count; i++){
+		if(i == 1){
+			//only draw for second one
+			Console.WriteLn(fmt::format("ImGuiManager::DrawSoftwareCursors() s_software_cursors[{}].image_path: '{}'", i, s_software_cursors[i].image_path.c_str()));
+			DrawSoftwareCursor(s_software_cursors[i], InputManager::GetPointerAbsolutePosition(i));
+		}
+	//for (u32 i = InputManager::MAX_POINTER_DEVICES; i < InputManager::MAX_SOFTWARE_CURSORS; i++){
+		/*struct SoftwareCursor
+		{
+			std::string image_path;
+			std::unique_ptr<GSTexture> texture;
+			u32 color;
+			float scale;
+			float extent_x;
+			float extent_y;
+			std::pair<float, float> pos;
+		};*/
+		//Console.WriteLn(fmt::format("ImGuiManager::DrawSoftwareCursors() index: '{}'", i));
+		//Console.WriteLn(fmt::format("ImGuiManager::DrawSoftwareCursors() s_software_cursors[%u].image_path: '%s'", i, s_software_cursors[i].image_path.c_str()));
+		//Console.WriteLn(fmt::format("ImGuiManager::DrawSoftwareCursors() s_software_cursors[index].color: '{}'", s_software_cursors[i].color));
+		//DrawSoftwareCursor(s_software_cursors[i], s_software_cursors[i].pos);
+	}
 }
 
 void ImGuiManager::SetSoftwareCursor(u32 index, std::string image_path, float image_scale, u32 multiply_color)
 {
+	Console.WriteLn(fmt::format("ImGuiManager::SetSoftwareCursor() index: '{}' image_path: '{}'", index, image_path));
 	MTGS::RunOnGSThread([index, image_path = std::move(image_path), image_scale, multiply_color]() {
 		pxAssert(index < std::size(s_software_cursors));
 		SoftwareCursor& sc = s_software_cursors[index];
 		sc.color = multiply_color | 0xFF000000;
-		if (sc.image_path == image_path && sc.scale == image_scale)
+		Console.WriteLn(fmt::format("MTGS::RunOnGSThread() index: '{}' image_path: '{}'", index, image_path));
+		if (sc.image_path == image_path && sc.scale == image_scale){
+			Console.WriteLn("MTGS::RunOnGSThread() return");
 			return;
+		}
 
 		const bool is_hiding_or_showing = (image_path.empty() != sc.image_path.empty());
 		sc.image_path = std::move(image_path);
 		sc.scale = image_scale;
-		if (MTGS::IsOpen())
+		if (MTGS::IsOpen()){
+			Console.WriteLn(fmt::format("UpdateSoftwareCursorTexture({})", index));
 			UpdateSoftwareCursorTexture(index);
+		}
 
 		// Hide the system cursor when we activate a software cursor.
-		if (is_hiding_or_showing && index == 0)
+		if (is_hiding_or_showing) // && index == 0)
+			Console.WriteLn("Host::RunOnCPUThread(&InputManager::UpdateHostMouseMode);");
 			Host::RunOnCPUThread(&InputManager::UpdateHostMouseMode);
 	});
 }
@@ -1060,7 +1088,8 @@ void ImGuiManager::ClearSoftwareCursor(u32 index)
 
 void ImGuiManager::SetSoftwareCursorPosition(u32 index, float pos_x, float pos_y)
 {
-	pxAssert(index >= InputManager::MAX_POINTER_DEVICES);
+	//pxAssert(index >= InputManager::MAX_POINTER_DEVICES);
+	pxAssert(index < InputManager::MAX_SOFTWARE_CURSORS);
 	SoftwareCursor& sc = s_software_cursors[index];
 	sc.pos.first = pos_x;
 	sc.pos.second = pos_y;

@@ -545,12 +545,13 @@ namespace usb_lightgun
 
 	void GunCon2State::UpdateSoftwarePointerPosition()
 	{
-		pxAssert(has_relative_binds);
+		Console.WriteLn("void GunCon2State::UpdateSoftwarePointerPosition()...");
+		//pxAssert(has_relative_binds);
 		if (cursor_path.empty())
 			return;
 
 		const auto& [window_x, window_y] = GetAbsolutePositionFromRelativeAxes();
-		Console.Warning(fmt::format("ImGuiManager::SetSoftwareCursorPosition '{}'.", GetSoftwarePointerIndex()));
+		Console.WriteLn(fmt::format("ImGuiManager::SetSoftwareCursorPosition '{}'.", GetSoftwarePointerIndex()));
 		ImGuiManager::SetSoftwareCursorPosition(GetSoftwarePointerIndex(), window_x, window_y);
 	}
 
