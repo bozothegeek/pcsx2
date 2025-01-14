@@ -1032,7 +1032,7 @@ void ImGuiManager::DrawSoftwareCursors()
 			Console.WriteLn("ImGuiManager::DrawSoftwareCursors() no texture");
 			return;
 		}
-
+        const std::pair<float, float>& pos = InputManager::GetPointerAbsolutePosition(i);
 		const ImVec2 min(pos.first - s_software_cursors[i].extent_x, pos.second - s_software_cursors[i].extent_y);
 		const ImVec2 max(pos.first + s_software_cursors[i].extent_x, pos.second + s_software_cursors[i].extent_y);
 		dl->AddImage(
