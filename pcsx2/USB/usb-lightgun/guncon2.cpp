@@ -370,7 +370,8 @@ namespace usb_lightgun
 				if (p->ep->nr == 1)
 				{
 					const auto [pos_x, pos_y] = us->CalculatePosition();
-
+					if (!us->cursor_path.empty()) ImGuiManager::SetSoftwareCursorPosition(us->port, pos_x, pos_y);
+					
 					// Time Crisis games do a "calibration" by displaying a black frame for a single frame,
 					// waiting for the gun to report (0, 0), and then computing an offset on the first non-zero
 					// value. So, after the trigger is pulled, we wait for a few frames, then send the (0, 0)
@@ -552,7 +553,7 @@ namespace usb_lightgun
 
 		const auto& [window_x, window_y] = GetAbsolutePositionFromRelativeAxes();
 		//Console.WriteLn(fmt::format("ImGuiManager::SetSoftwareCursorPosition '{}'.", GetSoftwarePointerIndex()));
-		ImGuiManager::SetSoftwareCursorPosition(GetSoftwarePointerIndex(), window_x, window_y);
+		//ImGuiManager::SetSoftwareCursorPosition(GetSoftwarePointerIndex(), window_x, window_y);
 	}
 
 	const char* GunCon2Device::Name() const
@@ -818,7 +819,7 @@ namespace usb_lightgun
 				Console.WriteLn(fmt::format("SetSoftwareCursor s->cursor_scale    : '{}'", s->cursor_scale));
 				Console.WriteLn(fmt::format("SetSoftwareCursor s->cursor_color    : '{}'", s->cursor_color));
 				ImGuiManager::SetSoftwareCursor(new_pointer_index, s->cursor_path, s->cursor_scale, s->cursor_color);
-				s->UpdateSoftwarePointerPosition();
+				//s->UpdateSoftwarePointerPosition();
 			}
 			else if (had_software_cursor)
 			{
@@ -853,7 +854,7 @@ namespace usb_lightgun
 			if (s->relative_pos[rel_index] != value)
 			{
 				s->relative_pos[rel_index] = value;
-				s->UpdateSoftwarePointerPosition();
+				//s->UpdateSoftwarePointerPosition();
 			}
 		}
 	}
