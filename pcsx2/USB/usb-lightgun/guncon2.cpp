@@ -370,7 +370,7 @@ namespace usb_lightgun
 				if (p->ep->nr == 1)
 				{
 					const auto [pos_x, pos_y] = us->CalculatePosition();
-					if (!us->cursor_path.empty()) ImGuiManager::SetSoftwareCursorPosition(us->port, pos_x, pos_y);
+					if (!us->cursor_path.empty()) ImGuiManager::SetSoftwareCursorPosition(us->port, us->udev_internalGunX, us->udev_internalGunY);
 					
 					// Time Crisis games do a "calibration" by displaying a black frame for a single frame,
 					// waiting for the gun to report (0, 0), and then computing an offset on the first non-zero
@@ -481,7 +481,8 @@ namespace usb_lightgun
 		float pointer_x, pointer_y;
 		const auto& [window_x, window_y] =
 			(has_relative_binds) ? GetAbsolutePositionFromRelativeAxes() : InputManager::GetPointerAbsolutePosition(0);
-		GSTranslateWindowToDisplayCoordinates(window_x, window_y, &pointer_x, &pointer_y);
+		
+		//GSTranslateWindowToDisplayCoordinates(window_x, window_y, &pointer_x, &pointer_y);
 
 		if(udev_has(this)) {
 		  GSTranslateWindowToDisplayCoordinates(udev_internalGunX, udev_internalGunY, &pointer_x, &pointer_y);
