@@ -1043,7 +1043,7 @@ void ImGuiManager::DrawSoftwareCursors()
 		//Console.WriteLn(fmt::format("ImGuiManager::DrawSoftwareCursors() s_software_cursors[%u].image_path: '%s'", i, s_software_cursors[i].image_path.c_str()));
 		//Console.WriteLn(fmt::format("ImGuiManager::DrawSoftwareCursors() s_software_cursors[index].color: '{}'", s_software_cursors[i].color));
 		//DrawSoftwareCursor(s_software_cursors[i], s_software_cursors[i].pos);
-	}
+	//}
 }
 
 void ImGuiManager::SetSoftwareCursor(u32 index, std::string image_path, float image_scale, u32 multiply_color)
