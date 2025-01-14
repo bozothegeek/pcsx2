@@ -1024,9 +1024,27 @@ void ImGuiManager::DrawSoftwareCursors()
 {
 	// This one's okay to race, worst that happens is we render the wrong number of cursors for a frame.
 	const u32 pointer_count = InputManager::MAX_POINTER_DEVICES;
+	ImDrawList* dl = ImGui::GetForegroundDrawList();
 	for (u32 i = 0; i < pointer_count; i++){
-		//Console.WriteLn(fmt::format("ImGuiManager::DrawSoftwareCursors() s_software_cursors[{}].image_path: '{}'", i, s_software_cursors[i].image_path.c_str()));
-		DrawSoftwareCursor(s_software_cursors[i], InputManager::GetPointerAbsolutePosition(i));
+		Console.WriteLn(fmt::format("ImGuiManager::DrawSoftwareCursors() s_software_cursors[{}].image_path: '{}'", i, s_software_cursors[i].image_path.c_str()));
+		//DrawSoftwareCursor(s_software_cursors[i], InputManager::GetPointerAbsolutePosition(i));
+		if (!s_software_cursors[i].texture){
+			Console.WriteLn("ImGuiManager::DrawSoftwareCursors() no texture");
+			return;
+		}
+
+		const ImVec2 min(pos.first - s_software_cursors[i].extent_x, pos.second - s_software_cursors[i].extent_y);
+		const ImVec2 max(pos.first + s_software_cursors[i].extent_x, pos.second + s_software_cursors[i].extent_y);
+		dl->AddImage(
+			reinterpret_cast<ImTextureID>(s_software_cursors[i].texture.get()->GetNativeHandle()), min, max, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f), s_software_cursors[i].color);
+		// const float rounding = std::ceil(5.0f * scale);
+		// u8 opacity = 255;
+		// ImDrawList* dl = ImGui::GetBackgroundDrawList();
+		// dl->AddRectFilled(pos, ImVec2(pos.x + size.x, pos.y + size.y), IM_COL32(0x21, 0x21, 0x21, opacity), rounding);
+		// dl->AddRect(pos, ImVec2(pos.x + size.x, pos.y + size.y), IM_COL32(0x48, 0x48, 0x48, opacity), rounding);
+		// dl->AddText(font, font->FontSize, ImVec2(text_rect.x, text_rect.y), IM_COL32(0xff, 0xff, 0xff, opacity), msg.text.c_str(),
+			// msg.text.c_str() + msg.text.length(), max_width, &text_rect);
+		// position_y += size.y + spacing;
 	}
 	//for (u32 i = InputManager::MAX_POINTER_DEVICES; i < InputManager::MAX_SOFTWARE_CURSORS; i++){
 		/*struct SoftwareCursor
