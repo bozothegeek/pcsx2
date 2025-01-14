@@ -310,15 +310,15 @@ namespace usb_lightgun
 				//Console.WriteLn(fmt::format("                          event->code  '{}'", event->code));
 				switch (event->code) {
 					case BTN_LEFT:
-						Console.WriteLn("event->type ('EV_KEY') event->code ('BTN_LEFT')");
-						Console.WriteLn(fmt::format("                       event->value  '{}'", event->value));
+						//Console.WriteLn("event->type ('EV_KEY') event->code ('BTN_LEFT')");
+						//Console.WriteLn(fmt::format("                       event->value  '{}'", event->value));
 						updateState(us, BID_TRIGGER, event->value != 0); // 0: unpressed, 1: pressed, 2: maintained
 						//tip to manage "buggy" calibration easily in PCSX2
 						if (!us->calibrated) updateState(us, BID_RECALIBRATE, event->value != 0);
 					break;
 					case BTN_RIGHT:
-						Console.WriteLn("event->type ('EV_KEY') event->code ('BTN_RIGHT')");
-						Console.WriteLn(fmt::format("                       event->value  '{}'", event->value));
+						//Console.WriteLn("event->type ('EV_KEY') event->code ('BTN_RIGHT')");
+						//Console.WriteLn(fmt::format("                       event->value  '{}'", event->value));
 						//important to release calibration and to reload
 						updateState(us, BID_A, event->value != 0);
 						//tip to force end of calibration in all cases if we use A button
@@ -545,13 +545,13 @@ namespace usb_lightgun
 
 	void GunCon2State::UpdateSoftwarePointerPosition()
 	{
-		Console.WriteLn("void GunCon2State::UpdateSoftwarePointerPosition()...");
+		//Console.WriteLn("void GunCon2State::UpdateSoftwarePointerPosition()...");
 		//pxAssert(has_relative_binds);
 		if (cursor_path.empty())
 			return;
 
 		const auto& [window_x, window_y] = GetAbsolutePositionFromRelativeAxes();
-		Console.WriteLn(fmt::format("ImGuiManager::SetSoftwareCursorPosition '{}'.", GetSoftwarePointerIndex()));
+		//Console.WriteLn(fmt::format("ImGuiManager::SetSoftwareCursorPosition '{}'.", GetSoftwarePointerIndex()));
 		ImGuiManager::SetSoftwareCursorPosition(GetSoftwarePointerIndex(), window_x, window_y);
 	}
 
@@ -635,7 +635,7 @@ namespace usb_lightgun
 	  if (enumerate != NULL) {
 		//udev_enumerate_add_match_property(enumerate, "ID_INPUT_MOUSE", "1");
 		if(us->pathdevice.c_str()) {
-			Console.WriteLn(fmt::format("udev_open_gun: us->pathdevice.c_str()  '{}'", us->pathdevice.c_str()));
+			//Console.WriteLn(fmt::format("udev_open_gun: us->pathdevice.c_str()  '{}'", us->pathdevice.c_str()));
 			udev_enumerate_add_match_property(enumerate, "DEVNAME", us->pathdevice.c_str());
 			udev_enumerate_add_match_subsystem(enumerate, "input");
 			udev_enumerate_scan_devices(enumerate);
