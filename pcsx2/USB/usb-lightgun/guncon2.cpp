@@ -31,6 +31,18 @@
 
 #include <tuple>
 
+#include <libudev.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <cstdlib> // For system()
+#include <linux/input.h>
+#include "GS/Renderers/Common/GSDevice.h"
+
+//added from NIXX fork
+#include "common/Console.h"
+#include "Memory.h"
+
+
 namespace usb_lightgun
 {
 	enum : u32
@@ -87,9 +99,10 @@ namespace usb_lightgun
 		{"SCES-50889", 90.25f, 94.5f, 390, 169, 640, 256}, // Ninja Assault (E)
 		{"SLPS-20218", 90.0f, 92.0f, 320, 134, 640, 240}, // Ninja Assault (J)
 		{"SLUS-20492", 90.25f, 92.5f, 390, 132, 640, 240}, // Ninja Assault (U)
-		{"SLES-50650", 84.75f, 96.0f, 454, 164, 640, 240}, // Resident Evil Survivor 2 (E)
+		{"SLES-50650", 90.25f, 107.0f, 425, 135, 640, 240}, // Resident Evil Survivor 2 (E) Fixed, you need to press start to skip guncon calibration
 		{"SLES-51448", 90.25f, 95.0f, 420, 132, 640, 240}, // Resident Evil - Dead Aim (E)
 		{"SLUS-20669", 90.25f, 93.5f, 420, 132, 640, 240}, // Resident Evil - Dead Aim (U)
+		{"SLES-51617", 90.25f, 82.0f, 200, 154, 640, 256}, // Starsky & Hutch (E)
 		{"SLUS-20619", 90.25f, 91.75f, 453, 154, 640, 256}, // Starsky & Hutch (U)
 		{"SCES-50300", 90.25f, 102.75f, 390, 138, 640, 256}, // Time Crisis II (E)
 		{"SLUS-20219", 90.25f, 97.5f, 390, 154, 640, 240}, // Time Crisis 2 (U)
@@ -100,7 +113,7 @@ namespace usb_lightgun
 		// {"SLUS-20927", 94.5f, 104.75f, 423, 407, 768, 768}, // Time Crisis - Crisis Zone (U) (480p)
 		{"SCES-50411", 89.8f, 99.9f, 421, 138, 640, 256}, // Vampire Night (E)
 		{"SLPS-25077", 90.0f, 97.5f, 422, 118, 640, 240}, // Vampire Night (J)
-		{"SLUS-20221", 89.8f, 102.5f, 422, 124, 640, 228}, // Vampire Night (U)
+		{"SLUS-20221", 89.8f, 102.5f, 452, 137, 640, 228}, // Vampire Night (U) Fixed
 		{"SLES-51229", 110.15f, 100.0f, 433, 159, 512, 256}, // Virtua Cop - Elite Edition (E,J) (480i)
 		// {"SLES-51229", 85.75f, 92.0f, 456, 164, 640, 256}, // Virtua Cop - Elite Edition (E,J) (480p)
 	};
@@ -130,6 +143,7 @@ namespace usb_lightgun
 	struct GunCon2State
 	{
 		explicit GunCon2State(u32 port_);
+	        ~GunCon2State();
 
 		USBDevice dev{};
 		USBDesc desc{};
@@ -142,12 +156,18 @@ namespace usb_lightgun
 		//////////////////////////////////////////////////////////////////////////
 		bool has_relative_binds = false;
 		bool custom_config = false;
+		bool split_screen_hack = false;
+		bool split_screen_full_stretch = false;
 		u32 screen_width = 640;
 		u32 screen_height = 240;
 		float center_x = 320;
 		float center_y = 120;
 		float scale_x = 1.0f;
 		float scale_y = 1.0f;
+		
+		//added for pixL settings/tips
+		std::string pathdevice = "";
+		bool calibrated = false;
 
 		//////////////////////////////////////////////////////////////////////////
 		// Host State (Not Saved)
@@ -171,9 +191,28 @@ namespace usb_lightgun
 
 		bool auto_config_done = false;
 
+		//added from NIXX fork to detect split screen games
+		bool quitThread = false;
+		bool threadOutputLoaded = false;
+		void threadOutputs();
+		void threadAutoConfigure();
+		std::thread* myThread = nullptr;
+		std::thread* myThreadAutoConfigure = nullptr;
+		std::string active_game = "";
+		//to manage split screen cases
+		bool splitscreen_activated = false;
+		AspectRatioType initialRatio;
+		float initialStretch;
+
 		void AutoConfigure();
 
 		std::tuple<s16, s16> CalculatePosition();
+
+		// for udev
+		int   udev_fd;
+		float udev_internalGunX;
+		float udev_internalGunY;
+		int   udev_gunMinx, udev_gunMiny, udev_gunMaxx, udev_gunMaxy;
 
 		// 0..1, not -1..1.
 		std::pair<float, float> GetAbsolutePositionFromRelativeAxes() const;
@@ -240,6 +279,12 @@ namespace usb_lightgun
 		0x08, // Polling interval (frame counts)
 	};
 
+	struct event_udev_entry
+	{
+	  const char *devnode;
+	  struct udev_list_entry *item;
+	};
+
 	static void guncon2_handle_control(
 		USBDevice* dev, USBPacket* p, int request, int value, int index, int length, uint8_t* data)
 	{
@@ -253,7 +298,7 @@ namespace usb_lightgun
 			us->auto_config_done = true;
 		}
 
-		DevCon.WriteLn("guncon2: req %04X val: %04X idx: %04X len: %d\n", request, value, index, length);
+		DevCon.WriteLn("(GunCon2) (pixL-version): req %04X val: %04X idx: %04X len: %d\n", request, value, index, length);
 		if (usb_desc_handle_control(dev, p, request, value, index, length, data) >= 0)
 			return;
 
@@ -262,16 +307,78 @@ namespace usb_lightgun
 			us->param_x = static_cast<u16>(data[0]) | (static_cast<u16>(data[1]) << 8);
 			us->param_y = static_cast<u16>(data[2]) | (static_cast<u16>(data[3]) << 8);
 			us->param_mode = static_cast<u16>(data[4]) | (static_cast<u16>(data[5]) << 8);
-			DevCon.WriteLn("GunCon2 Set Param %04X %d %d", us->param_mode, us->param_x, us->param_y);
+			DevCon.WriteLn("(GunCon2) (pixL-version): Set Param %04X %d %d", us->param_mode, us->param_x, us->param_y);
 			return;
 		}
 
 		p->status = USB_RET_STALL;
 	}
 
+	void updateState(GunCon2State* us, u32 bid, bool pressed) {
+	  const u32 bit = 1u << bid;
+	  if (pressed)
+	    us->button_state |= bit;
+	  else
+	    us->button_state &= ~bit;
+	}
+
+	static bool udev_has(GunCon2State* us) {
+	  return us->udev_fd != -1;
+	}
+
+	static void udev_handle_event(GunCon2State* us, input_event* event) {
+		switch (event->type) {
+			case EV_KEY:
+				switch (event->code) {
+					case BTN_LEFT:
+						updateState(us, BID_TRIGGER, event->value != 0); // 0: unpressed, 1: pressed, 2: maintained
+						//tip to manage "buggy" calibration easily in PCSX2
+						if (!us->calibrated) updateState(us, BID_RECALIBRATE, event->value != 0);
+					break;
+					case BTN_RIGHT:
+						//important to release calibration and to reload
+						updateState(us, BID_A, event->value != 0);
+						//tip to force end of calibration in all cases if we use A button
+						us->calibrated = true;
+					break;
+					case BTN_MIDDLE:
+						updateState(us, BID_B, event->value != 0);
+					break;
+					default:
+					break;
+				}
+			break;
+			case EV_ABS:
+				switch (event->code) {
+					case ABS_X:
+						us->udev_internalGunX = ((event->value - us->udev_gunMinx) / ((float)(us->udev_gunMaxx - us->udev_gunMinx))) * g_gs_device->GetWindowWidth();
+					break;
+					case ABS_Y:
+						us->udev_internalGunY = ((event->value - us->udev_gunMiny) / ((float)(us->udev_gunMaxy - us->udev_gunMiny))) * g_gs_device->GetWindowHeight();
+					break;
+				}
+			break;
+		}
+	}
+
+	static void udev_poll_gun(GunCon2State* us) {
+	  struct input_event input_events[32];
+	  int j, len;
+
+	  if(us->udev_fd == -1) return;
+
+	  while ((len = read(us->udev_fd, input_events, sizeof(input_events))) > 0) {
+	    len /= sizeof(*input_events);
+	    for (j = 0; j < len; j++) {
+		udev_handle_event(us, &(input_events[j]));
+	    }
+	  }
+	}
+
 	static void guncon2_handle_data(USBDevice* dev, USBPacket* p)
 	{
 		GunCon2State* const us = USB_CONTAINER_OF(dev, GunCon2State, dev);
+		if(udev_has(us)) udev_poll_gun(us);
 
 		switch (p->pid)
 		{
@@ -280,7 +387,8 @@ namespace usb_lightgun
 				if (p->ep->nr == 1)
 				{
 					const auto [pos_x, pos_y] = us->CalculatePosition();
-
+					if (!us->cursor_path.empty()) ImGuiManager::SetSoftwareCursorPosition(us->port, us->udev_internalGunX, us->udev_internalGunY);
+					
 					// Time Crisis games do a "calibration" by displaying a black frame for a single frame,
 					// waiting for the gun to report (0, 0), and then computing an offset on the first non-zero
 					// value. So, after the trigger is pulled, we wait for a few frames, then send the (0, 0)
@@ -350,6 +458,122 @@ namespace usb_lightgun
 	GunCon2State::GunCon2State(u32 port_)
 		: port(port_)
 	{
+	  //added from NIXX fork
+	  myThreadAutoConfigure = new std::thread(&GunCon2State::threadAutoConfigure, this);	
+	  
+	  udev_fd = -1;
+	  udev_internalGunX = 0.0;
+	  udev_internalGunY = 0.0;
+	}
+
+	GunCon2State::~GunCon2State()
+	{
+	  if(udev_fd != -1) close(udev_fd);
+	  if (myThread != nullptr)
+	  {
+		  active_game = "";
+		  quitThread = true;
+			myThread->join();
+	  }
+	  if (myThreadAutoConfigure != nullptr)
+	  {
+	  	  quitThread = true;
+		  myThreadAutoConfigure->join();
+	  }
+	}
+	//added from NIXX fork
+	void GunCon2State::threadOutputs()
+	{
+		threadOutputLoaded = true;
+		Console.WriteLn("THREAD : Thread Start");
+		//keep initialRatio
+		initialRatio = EmuConfig.CurrentAspectRatio;
+		//keep initialStretch
+		initialStretch = GSConfig.StretchY;
+		while (VMManager::HasValidVM() && active_game != "" && !quitThread)
+		{
+			std::chrono::microseconds::rep timestamp =
+				std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch())
+					.count();
+			std::string output_signal = "";
+
+			//Time Crisis 2 EU
+			if (active_game == "SCES-50300") 
+			{
+				splitscreen_activated = memRead8(0x65CD24) == 1 ? true : false;
+			}
+			//Time Crisis 2 US
+			if (active_game == "SLUS-20219") 
+			{
+				splitscreen_activated = memRead8(0x63EE64) == 1 ? true : false;
+			}
+
+			//Time Crisis 3 EU
+			if (active_game == "SCES-51844") 
+			{
+				splitscreen_activated = memRead8(0x474EEC) == 1 ? true : false;
+			}
+			//Time Crisis 3 US
+			if (active_game == "SLUS-20645") 
+			{
+				splitscreen_activated = memRead8(0x43A16C) == 1 ? true : false;
+			}
+			//force ratio/stretch if splitscreen_activated and split_screen_hack requested
+			if(splitscreen_activated && split_screen_hack){
+				bool needToSwitchOrDisplayOverlay = false; 
+				if(EmuConfig.CurrentAspectRatio != AspectRatioType::R16_9){
+				  //force to 16/9 to use full size of the screen
+				  EmuConfig.CurrentAspectRatio = AspectRatioType::R16_9;
+				  needToSwitchOrDisplayOverlay = true;
+				}
+				if((!split_screen_full_stretch) && (GSConfig.StretchY == 100.0f)){
+				  //Stretch at 66% to have like 2 screens in 4/3 or 3/2
+				  GSConfig.StretchY = 66.0f;
+				  needToSwitchOrDisplayOverlay = true;
+				}
+				if(needToSwitchOrDisplayOverlay){
+				  //send command to switch overlay (or hide it if only one) from mangohud using F10 key
+				  int returnCode = std::system("(xdotool keydown F10; sleep 0.2; xdotool keyup F10)&");
+				}
+			}
+			else if((EmuConfig.CurrentAspectRatio != initialRatio) or (GSConfig.StretchY != initialStretch)){
+				//Restore initial ratio
+				EmuConfig.CurrentAspectRatio = initialRatio;
+				//Restore initial Stretch
+				GSConfig.StretchY = initialStretch;
+				//send command to restore initial overlay from mangohud using F10 key
+				int returnCode = std::system("(xdotool keydown F10; sleep 0.2; xdotool keyup F10)&");
+			}
+			std::this_thread::sleep_for(std::chrono::milliseconds(10));
+		}
+		Console.WriteLn("THREAD : Thread stop");
+	}
+
+    //added from NIXX fork
+	void GunCon2State::threadAutoConfigure()
+	{
+		int i = 0;
+		while (threadOutputLoaded == false)
+		{
+			if (quitThread)
+				return;
+			if (i < 50)
+			{
+				i++;
+			}
+			else
+			{
+				Console.WriteLn("ThreadLOAD INIT");
+				std::string serial = VMManager::GetDiscSerial();
+				if (serial != "" && active_game == "" && VMManager::HasValidVM())
+				{
+					active_game = serial;
+					myThread = new std::thread(&GunCon2State::threadOutputs, this);
+					return;
+				}
+			}
+			std::this_thread::sleep_for(std::chrono::milliseconds(100));
+		}
 	}
 
 	void GunCon2State::AutoConfigure()
@@ -359,22 +583,28 @@ namespace usb_lightgun
 		{
 			if (serial != gc.serial)
 				continue;
-
-			Console.WriteLn(fmt::format("(GunCon2) Using automatic config for '{}'", serial));
-			Console.WriteLn(fmt::format("  Scale: {}x{}", gc.scale_x / 100.0f, gc.scale_y / 100.0f));
-			Console.WriteLn(fmt::format("  Center Position: {}x{}", gc.center_x, gc.center_y));
-			Console.WriteLn(fmt::format("  Screen Size: {}x{}", gc.screen_width, gc.screen_height));
+				
+			//added from NIXX fork
+			active_game = serial;
+			
+			Console.WriteLn(fmt::format("(GunCon2) (pixL-version): Using automatic config for '{}'", serial));
 
 			scale_x = gc.scale_x / 100.0f;
 			scale_y = gc.scale_y / 100.0f;
+			Console.WriteLn(fmt::format("  Scale: {}x{}", scale_x, scale_y));
+			
 			center_x = static_cast<float>(gc.center_x);
 			center_y = static_cast<float>(gc.center_y);
+			Console.WriteLn(fmt::format("  Center Position: {}x{}", center_x, center_y));
+			
 			screen_width = gc.screen_width;
 			screen_height = gc.screen_height;
+			Console.WriteLn(fmt::format("  Screen Size: {}x{}", screen_width, screen_height));
+
 			return;
 		}
 
-		Console.Warning(fmt::format("(GunCon2) No automatic config found for '{}'.", serial));
+		Console.Warning(fmt::format("(GunCon2) (pixL-version): No automatic config found for '{}'.", serial));
 	}
 
 	std::tuple<s16, s16> GunCon2State::CalculatePosition()
@@ -382,8 +612,150 @@ namespace usb_lightgun
 		float pointer_x, pointer_y;
 		const auto& [window_x, window_y] =
 			(has_relative_binds) ? GetAbsolutePositionFromRelativeAxes() : InputManager::GetPointerAbsolutePosition(0);
-		GSTranslateWindowToDisplayCoordinates(window_x, window_y, &pointer_x, &pointer_y);
 
+		if(udev_has(this)) {
+		  GSTranslateWindowToDisplayCoordinates(udev_internalGunX, udev_internalGunY, &pointer_x, &pointer_y);
+		} else {
+		  // basic mouse position
+		  GSTranslateWindowToDisplayCoordinates(window_x, window_y, &pointer_x, &pointer_y);
+		}
+		
+		//added from NIXX fork
+		//Apply aim adjustement for 2 players TimeCrisis if splitscreen activated
+		float pointer_x2 = pointer_x;
+		float pointer_y2 = pointer_y;
+		if ((active_game == "SLUS-20219" || active_game == "SCES-50300" || active_game == "SCES-51844" || active_game == "SLUS-20645") && splitscreen_activated)
+		{
+			if (active_game == "SLUS-20219")
+			{
+				if (port == 0)
+				{
+					float min = 0.035;
+					float max = 0.9035;
+
+					pointer_x = (pointer_x * (max - min)) + min;
+
+					min = 0.25;
+					max = 0.69;
+
+					pointer_y = (pointer_y * (max - min)) + min;
+					if (pointer_y > 0 && pointer_y < 1)
+						pointer_y += ((-0.04 * (pointer_y2 * pointer_y2)) + (0.04 * pointer_y2)) * 2.7;
+				}
+				if (port == 1)
+				{
+					float min = 0.093;
+					float max = 0.970;
+
+					pointer_x = (pointer_x * (max - min)) + min;
+
+					min = 0.247;
+					max = 0.690;
+
+					pointer_y = (pointer_y * (max - min)) + min;
+					if (pointer_y > 0 && pointer_y < 1)
+						pointer_y += ((-0.04 * (pointer_y2 * pointer_y2)) + (0.04 * pointer_y2)) * 2.7;
+				}
+			}
+			if (active_game == "SCES-50300")
+			{
+				if (port == 0)
+				{
+					float min = 0.02798462;
+					float max = 0.90;
+					pointer_x = (pointer_x * (max - min)) + min;
+
+					min = 0.25;
+					max = 0.6950202;
+
+					pointer_y = (pointer_y * (max - min)) + min;
+					if (pointer_y > 0 && pointer_y < 1)
+						pointer_y += ((-0.04 * (pointer_y2 * pointer_y2)) + (0.04 * pointer_y2)) * 2.7;
+				}
+				if (port == 1)
+				{
+					float min = 0.093;
+					float max = 0.970;
+
+					pointer_x = (pointer_x * (max - min)) + min;
+
+					min = 0.247;
+					max = 0.690;
+
+					pointer_y = (pointer_y * (max - min)) + min;
+					if (pointer_y > 0 && pointer_y < 1)
+						pointer_y += ((-0.04 * (pointer_y2 * pointer_y2)) + (0.04 * pointer_y2)) * 2.7;
+				}
+			}
+
+			if (active_game == "SCES-51844")
+			{
+				if (port == 0)
+				{
+					float min = 0.035;
+					float max = 0.9035;
+
+					pointer_x = (pointer_x * (max - min)) + min;
+
+					min = 0.247;
+					max = 0.690;
+
+					pointer_y = (pointer_y * (max - min)) + min;
+					if (pointer_y > 0 && pointer_y < 1)
+						pointer_y += ((-0.04 * (pointer_y2 * pointer_y2)) + (0.04 * pointer_y2)) * 3.0;
+				}
+				if (port == 1)
+				{
+
+					float min = 0.095;
+					float max = 0.97;
+
+					pointer_x = (pointer_x * (max - min)) + min;
+
+					min = 0.247;
+					max = 0.690;
+
+					pointer_y = (pointer_y * (max - min)) + min;
+					if (pointer_y > 0 && pointer_y < 1)
+						pointer_y += ((-0.04 * (pointer_y2 * pointer_y2)) + (0.04 * pointer_y2)) * 3.0;
+				}
+			}
+
+			if (active_game == "SLUS-20645")
+			{
+				if (port == 0)
+				{
+					float min = 0.035;
+					float max = 0.9035;
+
+					pointer_x = (pointer_x * (max - min)) + min;
+
+					min = 0.247;
+					max = 0.690;
+
+					pointer_y = (pointer_y * (max - min)) + min;
+
+					if (pointer_y > 0 && pointer_y < 1)
+						pointer_y += ((-0.04 * (pointer_y2 * pointer_y2)) + (0.04 * pointer_y2)) * 3.1;
+				}
+				if (port == 1)
+				{
+
+					float min = 0.095;
+					float max = 0.97;
+
+					pointer_x = (pointer_x * (max - min)) + min;
+
+					min = 0.247;
+					max = 0.690;
+
+					pointer_y = (pointer_y * (max - min)) + min;
+
+					if (pointer_y > 0 && pointer_y < 1)
+						pointer_y += ((-0.04 * (pointer_y2 * pointer_y2)) + (0.04 * pointer_y2)) * 3.1;
+				}
+			}
+		}
 		s16 pos_x, pos_y;
 		if (pointer_x < 0.0f || pointer_y < 0.0f)
 		{
@@ -435,7 +807,7 @@ namespace usb_lightgun
 
 	u32 GunCon2State::GetSoftwarePointerIndex() const
 	{
-		return has_relative_binds ? (InputManager::MAX_POINTER_DEVICES + port) : 0;
+		return has_relative_binds ? (InputManager::MAX_POINTER_DEVICES + port) : port;
 	}
 
 	void GunCon2State::UpdateSoftwarePointerPosition()
@@ -445,7 +817,7 @@ namespace usb_lightgun
 			return;
 
 		const auto& [window_x, window_y] = GetAbsolutePositionFromRelativeAxes();
-		ImGuiManager::SetSoftwareCursorPosition(GetSoftwarePointerIndex(), window_x, window_y);
+		//ImGuiManager::SetSoftwareCursorPosition(GetSoftwarePointerIndex(), window_x, window_y);
 	}
 
 	const char* GunCon2Device::Name() const
@@ -458,9 +830,148 @@ namespace usb_lightgun
 		return "guncon2";
 	}
 
+	int event_isNumber(const char *s) {
+	  int n;
+
+	  if(strlen(s) == 0) {
+	    return 0;
+	  }
+
+	  for(n=0; n<strlen(s); n++) {
+	    if(!(s[n] == '0' || s[n] == '1' || s[n] == '2' || s[n] == '3' || s[n] == '4' ||
+	         s[n] == '5' || s[n] == '6' || s[n] == '7' || s[n] == '8' || s[n] == '9'))
+	      return 0;
+	  }
+	  return 1;
+	}
+
+	// compare /dev/input/eventX and /dev/input/eventY where X and Y are numbers
+	int event_strcmp_events(const char* x, const char* y) {
+	  // find a common string
+	  int n, common, is_number;
+	  int a, b;
+
+	  n=0;
+	  while(x[n] == y[n] && x[n] != '\0' && y[n] != '\0') {
+	    n++;
+	  }
+	  common = n;
+
+	  // check if remaining string is a number
+	  is_number = 1;
+	  if(event_isNumber(x+common) == 0) is_number = 0;
+	  if(event_isNumber(y+common) == 0) is_number = 0;
+
+	  if(is_number == 1) {
+	    a = atoi(x+common);
+	    b = atoi(y+common);
+
+	    if(a == b) return  0;
+	    if(a < b)  return -1;
+	    return 1;
+	  } else {
+	    return strcmp(x, y);
+	  }
+	}
+
+	/* Used for sorting devnodes to appear in the correct order */
+	int sort_devnodes(const void *a, const void *b)
+	{
+	  const struct event_udev_entry *aa = (const struct event_udev_entry*)a;
+	  const struct event_udev_entry *bb = (const struct event_udev_entry*)b;
+	  return event_strcmp_events(aa->devnode, bb->devnode);
+	}
+
+	void GunCon2Device::udev_open_gun(GunCon2State* us) {
+	  struct udev_enumerate *enumerate;
+	  struct udev_list_entry     *devs = NULL;
+	  struct udev_list_entry     *item = NULL;
+	  //unsigned sorted_count = 0;
+	  struct event_udev_entry sorted[8]; // max devices
+	  unsigned int i;
+	  struct udev *udev;
+	  int fd = -1;
+
+	  udev = udev_new();
+	  if(udev == NULL) return;
+
+	  enumerate = udev_enumerate_new(udev);
+
+	  if (enumerate != NULL) {
+		if(us->pathdevice.c_str()) {
+			//Console.WriteLn(fmt::format("udev_open_gun: us->pathdevice.c_str()  '{}'", us->pathdevice.c_str()));
+			udev_enumerate_add_match_property(enumerate, "DEVNAME", us->pathdevice.c_str());
+			udev_enumerate_add_match_subsystem(enumerate, "input");
+			udev_enumerate_scan_devices(enumerate);
+			devs = udev_enumerate_get_list_entry(enumerate);
+			//normally only one will be available but we keep full list scan in case of issue and avoid crash
+			const char *name;
+			struct udev_device *dev;
+			const char *devnode;
+			for (item = devs; item; item = udev_list_entry_get_next(item)) {
+			  name = udev_list_entry_get_name(item);
+			  if(name) Console.WriteLn(fmt::format("udev_open_gun: udev_list_entry_get_name(item)  '{}'", name));
+			  else Console.WriteLn("udev_open_gun: udev_list_entry_get_name(item)  return NULL");
+			  dev = udev_device_new_from_syspath(udev, name);
+			  devnode = udev_device_get_devnode(dev);
+			  if(devnode) Console.WriteLn(fmt::format("udev_open_gun: udev_device_get_devnode(item)  '{}'", devnode));
+			  else Console.WriteLn("udev_open_gun: udev_device_get_devnode(item)  return NULL");
+			}
+			
+			char devname[64];
+			if (devnode) {
+			  fd = open(devnode, O_RDONLY | O_NONBLOCK);
+			  if (fd != -1) {
+				if (ioctl(fd, EVIOCGNAME(sizeof(devname)), devname) < 0) {
+				  devname[0] = '\0';
+				}
+			  }
+			  udev_device_unref(dev);
+			}
+		}
+		else Console.WriteLn("udev_open_gun: us->pathdevice.c_str()  return NULL ");
+	    udev_enumerate_unref(enumerate);
+	  }
+	  if (udev != NULL) udev_unref(udev);
+
+	  // configure
+	  us->udev_fd = fd;
+	  if(fd != -1) {
+	    udev_configure_gun(us);
+	  }
+	  else{
+	    Console.WriteLn("udev_configure_gun not done !!!");
+	  }
+	}
+
+  	void GunCon2Device::udev_configure_gun(GunCon2State* us) {
+	  struct input_absinfo absx, absy;
+	  if(ioctl(us->udev_fd, EVIOCGABS(ABS_X), &absx) >= 0) {
+	    if(ioctl(us->udev_fd, EVIOCGABS(ABS_Y), &absy) >= 0) {
+	      us->udev_gunMinx = absx.minimum;
+	      us->udev_gunMaxx = absx.maximum;
+	      us->udev_gunMiny = absy.minimum;
+	      us->udev_gunMaxy = absy.maximum;
+	    }
+	  }
+	}
+
 	USBDevice* GunCon2Device::CreateDevice(SettingsInterface& si, u32 port, u32 subtype) const
 	{
+		// USB port index
+		Console.WriteLn(fmt::format("(GunCon2) (pixL-version): CreateDevice -  port '{}'", port));
 		GunCon2State* s = new GunCon2State(port);
+		// path device
+		s->pathdevice = USB::GetConfigString(si, s->port, TypeName(), "device_path");
+		if(s->pathdevice.c_str()){
+			Console.WriteLn(fmt::format("(GunCon2) (pixL-version): CreateDevice -  pathdevice '{}'", s->pathdevice));
+		}
+		else{
+			Console.WriteLn(fmt::format("(GunCon2) (pixL-version): CreateDevice -  missing 'device_path' parameter !"));
+			goto fail;
+		}
+		udev_open_gun(s);
+
 		s->desc.full = &s->desc_dev;
 		s->desc.str = desc_strings;
 
@@ -493,7 +1004,10 @@ namespace usb_lightgun
 		GunCon2State* s = USB_CONTAINER_OF(dev, GunCon2State, dev);
 
 		s->custom_config = USB::GetConfigBool(si, s->port, TypeName(), "custom_config", false);
-
+		//To manage split screen hack
+		s->split_screen_hack = USB::GetConfigBool(si, s->port, TypeName(), "split_screen_hack", false);
+		//To manage split screen full stretch
+		s->split_screen_full_stretch = USB::GetConfigBool(si, s->port, TypeName(), "split_screen_full_stretch", false);
 		// Don't override auto config if we've set it.
 		if (!s->auto_config_done || s->custom_config)
 		{
@@ -543,7 +1057,7 @@ namespace usb_lightgun
 			if (!s->cursor_path.empty())
 			{
 				ImGuiManager::SetSoftwareCursor(new_pointer_index, s->cursor_path, s->cursor_scale, s->cursor_color);
-				s->UpdateSoftwarePointerPosition();
+				if(!udev_has(s)) s->UpdateSoftwarePointerPosition();
 			}
 			else if (had_software_cursor)
 			{
@@ -578,7 +1092,7 @@ namespace usb_lightgun
 			if (s->relative_pos[rel_index] != value)
 			{
 				s->relative_pos[rel_index] = value;
-				s->UpdateSoftwarePointerPosition();
+				if(!udev_has(s)) s->UpdateSoftwarePointerPosition();
 			}
 		}
 	}
