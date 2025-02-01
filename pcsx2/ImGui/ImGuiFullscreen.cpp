@@ -2522,6 +2522,11 @@ void ImGuiFullscreen::DrawNotifications(ImVec2& position, float spacing)
 	const u32 toast_title_color = s_light_theme ? IM_COL32(1, 1, 1, 255) : IM_COL32(0xff, 0xff, 0xff, 255);
 	const u32 toast_text_color = s_light_theme ? IM_COL32(0, 0, 0, 255) : IM_COL32(0xff, 0xff, 0xff, 255);
 
+	// Get the screen width and height
+	const ImGuiIO& io = ImGui::GetIO();
+	const float screen_width = io.DisplaySize.x;
+	const float screen_height = io.DisplaySize.y;
+
 	for (u32 index = 0; index < static_cast<u32>(s_notifications.size());)
 	{
 		Notification& notif = s_notifications[index];
@@ -2542,6 +2547,13 @@ void ImGuiFullscreen::DrawNotifications(ImVec2& position, float spacing)
 			(horizontal_padding * 2.0f) + badge_size + horizontal_spacing + std::max(title_size.x, text_size.x), min_width);
 		const float box_height =
 			std::max((vertical_padding * 2.0f) + title_size.y + vertical_spacing + text_size.y, min_height);
+
+		if (EmuConfig.CurrentAspectRatio != AspectRatioType::R16_9){
+			//Calculate the width of the 4:3 view within the screen
+			const float view_width = screen_height * (4/3);
+			//Calculate the horizontal offset (centering the 4:3 view)
+			position.x = (screen_width - view_width - box_width) / 2.0f;
+		}
 
 		u8 opacity;
 		if (time_passed < NOTIFICATION_FADE_IN_TIME)

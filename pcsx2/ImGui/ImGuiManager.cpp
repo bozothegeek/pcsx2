@@ -735,6 +735,12 @@ void ImGuiManager::DrawOSDMessages(Common::Timer::Value current_time)
 	const float padding = std::ceil(8.0f * scale);
 	const float rounding = std::ceil(5.0f * scale);
 	const float max_width = s_window_width - (margin + padding) * 2.0f;
+
+	// Get the screen width and height
+	const ImGuiIO& io = ImGui::GetIO();
+	const float screen_width = io.DisplaySize.x;
+	const float screen_height = io.DisplaySize.y;
+
 	float position_x = margin;
 	float position_y = margin;
 
@@ -788,10 +794,16 @@ void ImGuiManager::DrawOSDMessages(Common::Timer::Value current_time)
 		if (actual_y >= s_window_height)
 			break;
 
-		const ImVec2 pos(position_x, actual_y);
 		const ImVec2 text_size(
 			font->CalcTextSizeA(font->FontSize, max_width, max_width, msg.text.c_str(), msg.text.c_str() + msg.text.length()));
 		const ImVec2 size(text_size.x + padding * 2.0f, text_size.y + padding * 2.0f);
+		if (EmuConfig.CurrentAspectRatio != AspectRatioType::R16_9){
+			//Calculate the width of the 4:3 view within the screen
+			const float view_width = screen_height * (4/3);
+			//Calculate the horizontal offset (centering the 4:3 view)
+			position_x = margin + ((screen_width - view_width - size.x) / 2.0f);
+		}
+		const ImVec2 pos(position_x, actual_y);
 		const ImVec4 text_rect(pos.x + padding, pos.y + padding, pos.x + size.x - padding, pos.y + size.y - padding);
 
 		ImDrawList* dl = ImGui::GetBackgroundDrawList();
