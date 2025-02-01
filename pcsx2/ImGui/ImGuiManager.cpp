@@ -959,10 +959,12 @@ bool ImGuiManager::ProcessGenericInputEvent(GenericInputBinding key, float value
 
 void ImGuiManager::CreateSoftwareCursorTextures()
 {
+	//Console.WriteLn(fmt::format("(GunCon2) (pixL-version): CreateSoftwareCursorTextures()"));
 	for (u32 i = 0; i < InputManager::MAX_POINTER_DEVICES; i++)
 	{
-		if (!s_software_cursors[i].image_path.empty())
+		if (!s_software_cursors[i].image_path.empty()){
 			UpdateSoftwareCursorTexture(i);
+		}
 	}
 }
 
@@ -976,9 +978,11 @@ void ImGuiManager::DestroySoftwareCursorTextures()
 
 void ImGuiManager::UpdateSoftwareCursorTexture(u32 index)
 {
+	//Console.WriteLn(fmt::format("(GunCon2) (pixL-version): UpdateSoftwareCursorTexture({})", index));
 	SoftwareCursor& sc = s_software_cursors[index];
 	if (sc.image_path.empty())
 	{
+		//Console.WriteLn(fmt::format("(GunCon2) (pixL-version): sc.image_path.empty()"));
 		sc.texture.reset();
 		return;
 	}
@@ -986,14 +990,14 @@ void ImGuiManager::UpdateSoftwareCursorTexture(u32 index)
 	Common::RGBA8Image image;
 	if (!image.LoadFromFile(sc.image_path.c_str()))
 	{
-		Console.Error("Failed to load software cursor %u image '%s'", index, sc.image_path.c_str());
+		Console.Error("(GunCon2) (pixL-version): Failed to load software cursor %u image '%s'", index, sc.image_path.c_str());
 		return;
 	}
 	sc.texture = std::unique_ptr<GSTexture>(g_gs_device->CreateTexture(image.GetWidth(), image.GetHeight(), 1, GSTexture::Format::Color));
 	if (!sc.texture)
 	{
 		Console.Error(
-			"Failed to upload %ux%u software cursor %u image '%s'", image.GetWidth(), image.GetHeight(), index, sc.image_path.c_str());
+			"(GunCon2) (pixL-version): Failed to upload %ux%u software cursor %u image '%s'", image.GetWidth(), image.GetHeight(), index, sc.image_path.c_str());
 		return;
 	}
 	sc.texture->Update(GSVector4i(0, 0, image.GetWidth(), image.GetHeight()), image.GetPixels(), image.GetByteStride(), 0);
@@ -1020,30 +1024,40 @@ void ImGuiManager::DrawSoftwareCursors()
 {
 	// This one's okay to race, worst that happens is we render the wrong number of cursors for a frame.
 	const u32 pointer_count = InputManager::MAX_POINTER_DEVICES;
-	for (u32 i = 0; i < pointer_count; i++)
-		DrawSoftwareCursor(s_software_cursors[i], InputManager::GetPointerAbsolutePosition(i));
-
-	for (u32 i = InputManager::MAX_POINTER_DEVICES; i < InputManager::MAX_SOFTWARE_CURSORS; i++)
-		DrawSoftwareCursor(s_software_cursors[i], s_software_cursors[i].pos);
+	ImDrawList* dl = ImGui::GetForegroundDrawList();
+	for (u32 i = 0; i < pointer_count; i++){
+		if (!s_software_cursors[i].texture)
+			continue;
+		const std::pair<float, float>& pos = s_software_cursors[i].pos;
+		const ImVec2 min(pos.first - s_software_cursors[i].extent_x, pos.second - s_software_cursors[i].extent_y);
+		const ImVec2 max(pos.first + s_software_cursors[i].extent_x, pos.second + s_software_cursors[i].extent_y);
+		dl->AddImage(
+			reinterpret_cast<ImTextureID>(s_software_cursors[i].texture.get()->GetNativeHandle()), min, max, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f), s_software_cursors[i].color);
+	}
 }
 
 void ImGuiManager::SetSoftwareCursor(u32 index, std::string image_path, float image_scale, u32 multiply_color)
 {
+	//Console.WriteLn(fmt::format("(GunCon2) (pixL-version): SetSoftwareCursor({},{},{},{})", index, image_path, image_scale, multiply_color));
 	MTGS::RunOnGSThread([index, image_path = std::move(image_path), image_scale, multiply_color]() {
 		pxAssert(index < std::size(s_software_cursors));
 		SoftwareCursor& sc = s_software_cursors[index];
 		sc.color = multiply_color | 0xFF000000;
-		if (sc.image_path == image_path && sc.scale == image_scale)
+		if (sc.image_path == image_path && sc.scale == image_scale){
+			//Console.WriteLn(fmt::format("(GunCon2) (pixL-version): sc.image_path == image_path && sc.scale == image_scale"));
 			return;
+		}
 
 		const bool is_hiding_or_showing = (image_path.empty() != sc.image_path.empty());
 		sc.image_path = std::move(image_path);
 		sc.scale = image_scale;
-		if (MTGS::IsOpen())
+		if (MTGS::IsOpen()){
+			//Console.WriteLn(fmt::format("(GunCon2) (pixL-version): UpdateSoftwareCursorTexture({})", index));
 			UpdateSoftwareCursorTexture(index);
+		}
 
 		// Hide the system cursor when we activate a software cursor.
-		if (is_hiding_or_showing && index == 0)
+		if (is_hiding_or_showing)
 			Host::RunOnCPUThread(&InputManager::UpdateHostMouseMode);
 	});
 }
@@ -1060,7 +1074,8 @@ void ImGuiManager::ClearSoftwareCursor(u32 index)
 
 void ImGuiManager::SetSoftwareCursorPosition(u32 index, float pos_x, float pos_y)
 {
-	pxAssert(index >= InputManager::MAX_POINTER_DEVICES);
+	pxAssert(index < InputManager::MAX_SOFTWARE_CURSORS);
+	//Console.WriteLn(fmt::format("(GunCon2) (pixL-version): SetSoftwareCursorPosition({}, {}, {})", index, pos_x, pos_y));
 	SoftwareCursor& sc = s_software_cursors[index];
 	sc.pos.first = pos_x;
 	sc.pos.second = pos_y;
