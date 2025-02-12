@@ -88,6 +88,7 @@ set(pcsx2Sources
 	Hw.cpp
 	HwRead.cpp
 	HwWrite.cpp
+	language_injector.cpp
 	LayeredSettingsInterface.cpp
 	LogSink.cpp
 	INISettingsInterface.cpp
@@ -181,6 +182,7 @@ set(pcsx2Headers
 	IopGte.h
 	IopHw.h
 	IopMem.h
+	language_injector.h
 	LayeredSettingsInterface.h
 	LogSink.h
 	PINE.h

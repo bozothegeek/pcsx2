@@ -12,6 +12,7 @@
  *  You should have received a copy of the GNU General Public License along with PCSX2.
  *  If not, see <http://www.gnu.org/licenses/>.
  */
+ /* "PreferedSystemLanguage" management added for pixL */
 
 #include "PrecompiledHeader.h"
 
@@ -25,6 +26,9 @@
 #include "Common.h"
 #include "BiosTools.h"
 #include "Config.h"
+
+#include "Host.h"
+#include "language_injector.h"
 
 static constexpr u32 MIN_BIOS_SIZE = 4 * _1mb;
 static constexpr u32 MAX_BIOS_SIZE = 8 * _1mb;
@@ -314,6 +318,12 @@ bool LoadBIOS()
 		if (path.empty())
 			return false;
 	}
+
+	std::string language = Host::GetBaseStringSettingValue("EmuCore", "PreferedSystemLanguage");
+	if (language == ""){
+		language = "English"; //as default value
+	}
+	LanguageInjector::Inject(path, language.c_str());
 
 	auto fp = FileSystem::OpenManagedCFile(path.c_str(), "rb");
 	if (!fp)
