@@ -2513,6 +2513,7 @@ void ImGuiFullscreen::DrawNotifications(ImVec2& position, float spacing)
 	const float min_height = (vertical_padding * 2.0f) + badge_size;
 	const float shadow_size = ImGuiFullscreen::LayoutScale(4.0f);
 	const float rounding = ImGuiFullscreen::LayoutScale(4.0f);
+	const float margin = ImGuiFullscreen::LayoutScale(10.0f);
 
 	ImFont* const title_font = ImGuiFullscreen::g_large_font;
 	ImFont* const text_font = ImGuiFullscreen::g_medium_font;
@@ -2521,6 +2522,11 @@ void ImGuiFullscreen::DrawNotifications(ImVec2& position, float spacing)
 	const u32 toast_border_color = s_light_theme ? IM_COL32(0x88, 0x88, 0x88, 255) : IM_COL32(0x48, 0x48, 0x48, 255);
 	const u32 toast_title_color = s_light_theme ? IM_COL32(1, 1, 1, 255) : IM_COL32(0xff, 0xff, 0xff, 255);
 	const u32 toast_text_color = s_light_theme ? IM_COL32(0, 0, 0, 255) : IM_COL32(0xff, 0xff, 0xff, 255);
+
+	// Get the screen width and height
+	const ImGuiIO& io = ImGui::GetIO();
+	const float screen_width = io.DisplaySize.x;
+	const float screen_height = io.DisplaySize.y;
 
 	for (u32 index = 0; index < static_cast<u32>(s_notifications.size());)
 	{
@@ -2543,6 +2549,20 @@ void ImGuiFullscreen::DrawNotifications(ImVec2& position, float spacing)
 		const float box_height =
 			std::max((vertical_padding * 2.0f) + title_size.y + vertical_spacing + text_size.y, min_height);
 
+		if (EmuConfig.CurrentAspectRatio != AspectRatioType::R16_9){
+			//Calculate the width of the 4:3 view within the screen
+			const float view_width = screen_height * 1.33f; // 4/3 ratio
+			//Calculate the horizontal offset (centering the 4:3 view)
+			//Console.WriteLn(fmt::format("(ImGuiFullscreen) (pixL-version): screen_width = {}", screen_width));
+			//Console.WriteLn(fmt::format("(ImGuiFullscreen) (pixL-version): screen_height = {}", screen_height));
+			//Console.WriteLn(fmt::format("(ImGuiFullscreen) (pixL-version): view_width = {}", view_width));
+			position.x = margin + (ImGuiFullscreen::LayoutScale((screen_width - view_width) * 1.0f) / 2.0f);
+			position.x = position.x / ImGuiFullscreen::g_layout_scale;
+		}
+		//Console.WriteLn(fmt::format("(ImGuiFullscreen) (pixL-version): margin = {}", margin));
+		//Console.WriteLn(fmt::format("(ImGuiFullscreen) (pixL-version): ImGuiFullscreen::LayoutScale = {}", ImGuiFullscreen::LayoutScale(1.0f)));
+		//Console.WriteLn(fmt::format("(ImGuiFullscreen) (pixL-version): ImGuiFullscreen::g_layout_scale = {}", ImGuiFullscreen::g_layout_scale));
+		//Console.WriteLn(fmt::format("(ImGuiFullscreen) (pixL-version): position.x = {}", position.x));
 		u8 opacity;
 		if (time_passed < NOTIFICATION_FADE_IN_TIME)
 			opacity = static_cast<u8>((time_passed / NOTIFICATION_FADE_IN_TIME) * 255.0f);
