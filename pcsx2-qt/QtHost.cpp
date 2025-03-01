@@ -1243,14 +1243,14 @@ bool QtHost::InitializeConfig()
 	Host::Internal::SetBaseSettingsLayer(s_base_settings_interface.get());
 	if (!s_base_settings_interface->Load() || !VMManager::Internal::CheckSettingsVersion())
 	{
-		// If the config file doesn't exist, assume this is a new install and don't prompt to overwrite.
+		/* If the config file doesn't exist, assume this is a new install and don't prompt to overwrite.
 		if (FileSystem::FileExists(s_base_settings_interface->GetFileName().c_str()) &&
 			QMessageBox::question(nullptr, QStringLiteral("PCSX2"),
 				QStringLiteral("Settings failed to load, or are the incorrect version. Clicking Yes will reset all settings to defaults. "
 							   "Do you want to continue?")) != QMessageBox::Yes)
 		{
 			return false;
-		}
+		}*/
 
 		VMManager::SetDefaultSettings(*s_base_settings_interface, true, true, true, true, true);
 		
