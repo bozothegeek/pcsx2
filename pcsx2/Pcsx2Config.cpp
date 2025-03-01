@@ -1739,11 +1739,12 @@ void EmuFolders::SetDataDirectory()
 		if (home_dir)
 		{
 			// ~/.config should exist, but just in case it doesn't and this is a fresh profile..
-			const std::string config_dir(Path::Combine(home_dir, ".config"));
+			// pixL change directory to general ~/configs folder
+			const std::string config_dir(Path::Combine(home_dir, "configs"));
 			if (!FileSystem::DirectoryExists(config_dir.c_str()))
 				FileSystem::CreateDirectoryPath(config_dir.c_str(), false);
 
-			DataRoot = Path::RealPath(Path::Combine(config_dir, "PCSX2"));
+			DataRoot = Path::RealPath(Path::Combine(config_dir, "pcsx2"));
 		}
 	}
 #elif defined(__APPLE__)
@@ -1768,14 +1769,14 @@ void EmuFolders::SetDataDirectory()
 
 void EmuFolders::SetDefaults(SettingsInterface& si)
 {
-	si.SetStringValue("Folders", "Bios", "bios");
-	si.SetStringValue("Folders", "Snapshots", "snaps");
-	si.SetStringValue("Folders", "Savestates", "sstates");
-	si.SetStringValue("Folders", "MemoryCards", "memcards");
+	si.SetStringValue("Folders", "Bios", "/recalbox/share/bios/ps2/pcsx2");
+	si.SetStringValue("Folders", "Snapshots", "/recalbox/share/screenshots/");
+	si.SetStringValue("Folders", "Savestates", "/recalbox/share/saves/ps2/pcsx2/savestates");
+	si.SetStringValue("Folders", "MemoryCards", "/recalbox/share/saves/ps2/pcsx2/memorycards");
 	si.SetStringValue("Folders", "Logs", "logs");
-	si.SetStringValue("Folders", "Cheats", "cheats");
+	si.SetStringValue("Folders", "Cheats", "/recalbox/share/cheats/ps2/pcsx2/cheats");
 	si.SetStringValue("Folders", "Patches", "patches");
-	si.SetStringValue("Folders", "Cache", "cache");
+	si.SetStringValue("Folders", "Cache", "/recalbox/share/saves/ps2/pcsx2/cache");
 	si.SetStringValue("Folders", "Textures", "textures");
 	si.SetStringValue("Folders", "InputProfiles", "inputprofiles");
 	si.SetStringValue("Folders", "Videos", "videos");
@@ -1791,16 +1792,16 @@ static std::string LoadPathFromSettings(SettingsInterface& si, const std::string
 
 void EmuFolders::LoadConfig(SettingsInterface& si)
 {
-	Bios = LoadPathFromSettings(si, DataRoot, "Bios", "bios");
-	Snapshots = LoadPathFromSettings(si, DataRoot, "Snapshots", "snaps");
-	Savestates = LoadPathFromSettings(si, DataRoot, "Savestates", "sstates");
-	MemoryCards = LoadPathFromSettings(si, DataRoot, "MemoryCards", "memcards");
+	Bios = LoadPathFromSettings(si, DataRoot, "Bios", "/recalbox/share/bios/ps2/pcsx2");
+	Snapshots = LoadPathFromSettings(si, DataRoot, "Snapshots", "/recalbox/share/screenshots");
+	Savestates = LoadPathFromSettings(si, DataRoot, "Savestates", "/recalbox/share/saves/ps2/pcsx2/savestates");
+	MemoryCards = LoadPathFromSettings(si, DataRoot, "MemoryCards", "/recalbox/share/saves/ps2/pcsx2/memorycards");
 	Logs = LoadPathFromSettings(si, DataRoot, "Logs", "logs");
-	Cheats = LoadPathFromSettings(si, DataRoot, "Cheats", "cheats");
+	Cheats = LoadPathFromSettings(si, DataRoot, "Cheats", "/recalbox/share/cheats/ps2/pcsx2/cheats");
 	Patches = LoadPathFromSettings(si, DataRoot, "Patches", "patches");
-	Covers = LoadPathFromSettings(si, DataRoot, "Covers", "covers");
-	GameSettings = LoadPathFromSettings(si, DataRoot, "GameSettings", "gamesettings");
-	Cache = LoadPathFromSettings(si, DataRoot, "Cache", "cache");
+	Covers = LoadPathFromSettings(si, DataRoot, "Covers", "/recalbox/share/roms/ps2/media/box2front");
+	GameSettings = LoadPathFromSettings(si, DataRoot, "GameSettings", "/recalbox/share/saves/ps2/pcsx2/gamesettings");
+	Cache = LoadPathFromSettings(si, DataRoot, "Cache", "/recalbox/share/saves/ps2/pcsx2/cache");	
 	Textures = LoadPathFromSettings(si, DataRoot, "Textures", "textures");
 	InputProfiles = LoadPathFromSettings(si, DataRoot, "InputProfiles", "inputprofiles");
 	Videos = LoadPathFromSettings(si, DataRoot, "Videos", "videos");
