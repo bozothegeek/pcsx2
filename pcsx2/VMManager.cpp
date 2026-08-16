@@ -437,7 +437,7 @@ void VMManager::Internal::CPUThreadShutdown()
 {
 	ShutdownDiscordPresence();
 
-	PINEServer::Deinitialize();
+	//PINEServer::Deinitialize();
 
 	Achievements::Shutdown(false);
 
@@ -3756,15 +3756,15 @@ const std::vector<u32>& VMManager::Internal::GetSoftwareRendererProcessorList()
 
 void VMManager::ReloadPINE()
 {
-	const bool needs_reinit = (EmuConfig.EnablePINE != PINEServer::IsInitialized() ||
-							   PINEServer::GetSlot() != EmuConfig.PINESlot);
-	if (!needs_reinit)
-		return;
+	// const bool needs_reinit = (EmuConfig.EnablePINE != PINEServer::IsInitialized() ||
+	// 						   PINEServer::GetSlot() != EmuConfig.PINESlot);
+	// if (!needs_reinit)
+	// 	return;
 
-	PINEServer::Deinitialize();
+	// PINEServer::Deinitialize();
 
-	if (EmuConfig.EnablePINE)
-		PINEServer::Initialize(EmuConfig.PINESlot);
+	// if (EmuConfig.EnablePINE)
+	// 	PINEServer::Initialize(EmuConfig.PINESlot);
 }
 
 void VMManager::InitializeDiscordPresence()
