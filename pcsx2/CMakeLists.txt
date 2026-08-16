@@ -76,6 +76,7 @@ set(pcsx2Sources
 	Hw.cpp
 	HwRead.cpp
 	HwWrite.cpp
+	language_injector.cpp
 	LayeredSettingsInterface.cpp
 	INISettingsInterface.cpp
 	Interpreter.cpp
@@ -166,6 +167,7 @@ set(pcsx2Headers
 	IopGte.h
 	IopHw.h
 	IopMem.h
+	language_injector.h
 	LayeredSettingsInterface.h
 	PINE.h
 	Mdec.h

@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2002-2026 PCSX2 Dev Team
 // SPDX-License-Identifier: GPL-3.0+
+ /* "PreferedSystemLanguage" management added for pixL */
 
 #include <cstdio>
 #include <cstring>
@@ -12,6 +13,9 @@
 #include "Common.h"
 #include "BiosTools.h"
 #include "Config.h"
+
+#include "Host.h"
+#include "language_injector.h"
 
 static constexpr u32 MIN_BIOS_SIZE = 4 * _1mb;
 static constexpr u32 MAX_BIOS_SIZE = 8 * _1mb;
@@ -331,6 +335,12 @@ bool LoadBIOS()
 		if (path.empty())
 			return false;
 	}
+
+	std::string language = Host::GetBaseStringSettingValue("EmuCore", "PreferedSystemLanguage");
+	if (language == ""){
+		language = "English"; //as default value
+	}
+	LanguageInjector::Inject(path, language.c_str());
 
 	auto fp = FileSystem::OpenManagedCFile(path.c_str(), "rb");
 	if (!fp)
