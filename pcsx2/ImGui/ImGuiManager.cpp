@@ -925,7 +925,14 @@ void ImGuiManager::DrawOSDMessages(Common::Timer::Value current_time)
 	const float rounding = std::ceil(5.0f * scale);
 	const float max_width = s_window_width - (margin + padding) * 2.0f;
 
-	float position_y = margin;
+	// Get the screen width and height
+	const ImGuiIO& io = ImGui::GetIO();
+	const float screen_width = io.DisplaySize.x;
+	const float screen_height = io.DisplaySize.y;
+
+	float position_x = margin;
+	float position_y = margin * 1.5f;
+
 	switch (GSConfig.OsdMessagesPos)
 	{
 		case OsdOverlayPos::TopLeft:
@@ -1029,7 +1036,23 @@ void ImGuiManager::DrawOSDMessages(Common::Timer::Value current_time)
 		}
 
 		const ImVec2 base_pos = CalculateOSDPosition(GSConfig.OsdMessagesPos, margin, size, s_window_width, s_window_height);
-		const ImVec2 pos(base_pos.x, final_y);
+		if (EmuConfig.CurrentAspectRatio != AspectRatioType::R16_9){
+			//Calculate the width of the 4:3 view within the screen
+			const float view_width = screen_height * 1.33f; // 4/3 ratio
+			//Calculate the horizontal offset (centering the 4:3 view)
+			//Console.WriteLn(fmt::format("(ImGuiManager) (pixL-version): screen_width = {}", screen_width));
+			//Console.WriteLn(fmt::format("(ImGuiManager) (pixL-version): screen_height = {}", screen_height));
+			//Console.WriteLn(fmt::format("(ImGuiManager) (pixL-version): view_width = {}", view_width));
+			position_x = margin + std::ceil(((screen_width - view_width) / 2.0f) * scale);
+			position_x = position_x / ImGuiFullscreen::g_layout_scale;
+    		//Console.WriteLn(fmt::format("(ImGuiManager) (pixL-version): margin = {}", margin));
+    		//Console.WriteLn(fmt::format("(ImGuiManager) (pixL-version): scale = {}", scale));
+    		//Console.WriteLn(fmt::format("(ImGuiManager) (pixL-version): ImGuiFullscreen::g_layout_scale = {}", ImGuiFullscreen::g_layout_scale));
+    		//Console.WriteLn(fmt::format("(ImGuiManager) (pixL-version): position_x = {}", position_x));		
+        }
+		else position_x = base_pos.x; 
+
+        const ImVec2 pos(position_x, final_y);
 		const ImVec4 text_rect(pos.x + padding, pos.y + padding, pos.x + size.x - padding, pos.y + size.y - padding);
 
 		ImDrawList* dl = ImGui::GetBackgroundDrawList();
