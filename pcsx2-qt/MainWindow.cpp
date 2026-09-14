@@ -999,10 +999,10 @@ void MainWindow::onCaptureStopped()
 
 void MainWindow::onAchievementsLoginRequested(Achievements::LoginRequestReason reason)
 {
-	auto lock = pauseAndLockVM();
+	//auto lock = pauseAndLockVM();
 
-	AchievementLoginDialog dlg(lock.getDialogParent(), reason);
-	dlg.exec();
+	//AchievementLoginDialog dlg(lock.getDialogParent(), reason);
+	//dlg.exec();
 }
 
 void MainWindow::onAchievementsHardcoreModeChanged(bool enabled)

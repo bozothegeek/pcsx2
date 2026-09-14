@@ -1886,7 +1886,7 @@ void Achievements::ClientLoginWithTokenCallback(int result, const char* error_me
 	if (result != RC_OK)
 	{
 		ReportFmtError("Login failed: {}", error_message);
-		Host::OnAchievementsLoginRequested(LoginRequestReason::TokenInvalid);
+		//Host::OnAchievementsLoginRequested(LoginRequestReason::TokenInvalid);
 		return;
 	}
 
