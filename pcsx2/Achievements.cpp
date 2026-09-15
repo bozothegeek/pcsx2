@@ -1889,6 +1889,7 @@ void Achievements::ClientLoginWithTokenCallback(int result, const char* error_me
 	if (result != RC_OK)
 	{
 		ReportFmtError("Login failed: {}", error_message);
+		Console.WriteLn("Achievements: Login failed: %s", error_message);
 		//Host::OnAchievementsLoginRequested(LoginRequestReason::TokenInvalid);
 		return;
 	}
